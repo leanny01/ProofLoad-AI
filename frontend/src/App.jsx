@@ -1,70 +1,118 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import axios from "axios";
-import ImageUpload from "./components/ImageUpload";
-import ResultPanel from "./components/ResultPanel";
+import ManifestUpload from "./components/ManifestUpload";
+import CheckpointForm from "./components/CheckpointForm";
+import CheckpointReport from "./components/CheckpointReport";
+import DeltaReport from "./components/DeltaReport";
 import "./App.css";
 
 function App() {
-  const [expectedImage, setExpectedImage] = useState(null);
-  const [actualImage, setActualImage] = useState(null);
-  const [expectedPreview, setExpectedPreview] = useState(null);
-  const [actualPreview, setActualPreview] = useState(null);
-  const [result, setResult] = useState(null);
+  const [view, setView] = useState("home");
+  const [projects, setProjects] = useState([]);
+  const [project, setProject] = useState(null);
+  const [delta, setDelta] = useState(null);
+  const [selectedCheckpoint, setSelectedCheckpoint] = useState(null);
+  const [deltaFrom, setDeltaFrom] = useState("");
+  const [deltaTo, setDeltaTo] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
 
-  const handleImageSelect = (type, file) => {
-    const preview = URL.createObjectURL(file);
-    if (type === "expected") {
-      setExpectedImage(file);
-      setExpectedPreview(preview);
-    } else {
-      setActualImage(file);
-      setActualPreview(preview);
+  const loadProjects = async () => {
+    try {
+      const res = await axios.get("/api/projects");
+      setProjects(res.data.projects || []);
+    } catch {
+      setProjects([]);
     }
-    // Clear previous results on new image
-    setResult(null);
-    setError(null);
   };
 
-  const handleVerify = async () => {
-    if (!expectedImage || !actualImage) {
-      setError("Please upload both images before verifying.");
-      return;
-    }
+  useEffect(() => {
+    loadProjects();
+  }, []);
 
+  // Auto-trigger compare when both checkpoints are selected
+  useEffect(() => {
+    if (!project?.id || !deltaFrom || !deltaTo || deltaFrom === deltaTo) return;
+    const run = async () => {
+      try {
+        const res = await axios.get(`/api/projects/${project.id}/delta`, {
+          params: { from: deltaFrom, to: deltaTo },
+        });
+        setDelta(res.data.delta);
+        setSelectedCheckpoint(null);
+      } catch (err) {
+        setError(err.response?.data?.error || err.message || "Failed to fetch delta");
+      }
+    };
+    run();
+  }, [project?.id, deltaFrom, deltaTo]);
+
+  const handleCreateProject = async (file) => {
     setLoading(true);
     setError(null);
-    setResult(null);
-
     const formData = new FormData();
-    formData.append("expectedImage", expectedImage);
-    formData.append("actualImage", actualImage);
-
+    formData.append("manifest", file);
     try {
-      const response = await axios.post("/api/verify", formData, {
+      const res = await axios.post("/api/projects", formData, {
         headers: { "Content-Type": "multipart/form-data" },
-        timeout: 30000,
+        timeout: 60000,
       });
-      setResult(response.data);
+      setProject(res.data.project);
+      setView("project");
     } catch (err) {
-      const message =
-        err.response?.data?.error ||
-        err.message ||
-        "Verification failed. Please try again.";
-      setError(message);
+      setError(err.response?.data?.error || err.message || "Failed to create project");
     } finally {
       setLoading(false);
     }
   };
 
-  const handleReset = () => {
-    setExpectedImage(null);
-    setActualImage(null);
-    setExpectedPreview(null);
-    setActualPreview(null);
-    setResult(null);
-    setError(null);
+  const handleOpenProject = async (id) => {
+    try {
+      const res = await axios.get(`/api/projects/${id}`);
+      const proj = res.data.project;
+      setProject(proj);
+      setView("project");
+      setSelectedCheckpoint(null);
+      setDelta(null);
+      // Auto-select first and last checkpoint for comparison when 2+ exist
+      const cps = proj.checkpoints || [];
+      if (cps.length >= 2) {
+        setDeltaFrom(cps[0].id);
+        setDeltaTo(cps[cps.length - 1].id);
+      } else {
+        setDeltaFrom("");
+        setDeltaTo("");
+      }
+    } catch (err) {
+      setError(err.response?.data?.error || err.message || "Failed to load project");
+    }
+  };
+
+  const handleCheckpointAdded = (checkpoint) => {
+    if (project) {
+      const updatedCheckpoints = [...(project.checkpoints || []), checkpoint];
+      setProject({ ...project, checkpoints: updatedCheckpoints });
+      setSelectedCheckpoint(checkpoint);
+      setDelta(null);
+      // When adding second+ checkpoint, set "to" to the new one for comparison
+      if (updatedCheckpoints.length >= 2) {
+        setDeltaFrom(updatedCheckpoints[0].id);
+        setDeltaTo(checkpoint.id);
+      }
+    }
+  };
+
+  const handleFetchDelta = async () => {
+    if (!project?.id || !deltaFrom || !deltaTo) return;
+    try {
+      const res = await axios.get(`/api/projects/${project.id}/delta`, {
+        params: { from: deltaFrom, to: deltaTo },
+      });
+      setDelta(res.data.delta);
+      setSelectedCheckpoint(null);
+    } catch (err) {
+      setError(err.response?.data?.error || err.message || "Failed to fetch delta");
+    }
   };
 
   return (
@@ -84,64 +132,171 @@ function App() {
         </div>
         <div>
           <h1>ProofLoad AI</h1>
-          <p className="subtitle">Visual Load Verification</p>
+          <p className="subtitle">Load Verification with Checkpoints</p>
         </div>
       </header>
 
       <main>
-        <section className="upload-section">
-          <ImageUpload
-            label="Expected Load"
-            description="What should be loaded"
-            preview={expectedPreview}
-            onSelect={(file) => handleImageSelect("expected", file)}
-          />
-          <div className="vs-divider">
-            <span>VS</span>
-          </div>
-          <ImageUpload
-            label="Actual Load"
-            description="What was actually loaded"
-            preview={actualPreview}
-            onSelect={(file) => handleImageSelect("actual", file)}
-          />
-        </section>
-
-        <section className="action-section">
-          <button
-            className="verify-btn"
-            onClick={handleVerify}
-            disabled={loading || !expectedImage || !actualImage}
-          >
-            {loading ? (
-              <span className="spinner-wrap">
-                <span className="spinner" />
-                Analyzing...
-              </span>
-            ) : (
-              "Verify Load"
-            )}
-          </button>
-          {(result || error) && (
-            <button className="reset-btn" onClick={handleReset}>
-              Reset
-            </button>
-          )}
-        </section>
-
-        {error && (
-          <section className="error-section">
-            <div className="error-box">
-              <strong>Error:</strong> {error}
-            </div>
-          </section>
+        {view === "home" && (
+          <>
+            <section className="home-actions">
+              <button className="verify-btn" onClick={() => setView("create")}>
+                + New Project
+              </button>
+            </section>
+            <section className="projects-list">
+              <h2>Projects</h2>
+              {projects.length === 0 ? (
+                <p className="empty-state">No projects yet. Create one to get started.</p>
+              ) : (
+                <ul className="project-cards">
+                  {projects.map((p) => (
+                    <li key={p.id} className="project-card" onClick={() => handleOpenProject(p.id)}>
+                      <span className="project-filename">{p.expected_list_filename}</span>
+                      <span className="project-meta">
+                        {p.expected_items_count} items · {p.checkpoints_count} checkpoint(s)
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </section>
+          </>
         )}
 
-        {result && <ResultPanel result={result} />}
+        {view === "create" && (
+          <>
+            <button className="back-btn" onClick={() => setView("home")}>
+              ← Back
+            </button>
+            <ManifestUpload
+              onUpload={handleCreateProject}
+              loading={loading}
+              error={error}
+            />
+          </>
+        )}
+
+        {view === "project" && project && (
+          <>
+            <button className="back-btn" onClick={() => { setView("home"); setProject(null); setDelta(null); setSelectedCheckpoint(null); }}>
+              ← Back to projects
+            </button>
+
+            <section className="project-header">
+              <h2>{project.expected_list_filename}</h2>
+              <p className="project-meta">
+                {project.expected_items?.length ?? 0} expected items ·{" "}
+                {project.extraction_confidence} extraction confidence
+              </p>
+              {project.extraction_warnings?.length > 0 && (
+                <div className="warnings">
+                  {project.extraction_warnings.slice(0, 3).map((w, i) => (
+                    <span key={i} className="warning-tag">{w}</span>
+                  ))}
+                </div>
+              )}
+            </section>
+
+            <section className="expected-items">
+              <h3>Expected Items</h3>
+              <ul className="expected-list">
+                {project.expected_items?.slice(0, 15).map((it, i) => (
+                  <li key={i}>
+                    {it.name} {it.description && `— ${it.description}`}{" "}
+                    {it.expected_qty != null && `(qty: ${it.expected_qty})`}
+                  </li>
+                ))}
+                {project.expected_items?.length > 15 && (
+                  <li className="more">+{project.expected_items.length - 15} more</li>
+                )}
+              </ul>
+            </section>
+
+            <section className="checkpoints-section">
+              <h3>Checkpoints</h3>
+              <div className="checkpoints-row">
+                <div className="checkpoints-tabs">
+                  {(project.checkpoints || []).map((cp) => (
+                    <button
+                      key={cp.id}
+                      className={`checkpoint-tab ${selectedCheckpoint?.id === cp.id ? "active" : ""}`}
+                      onClick={() => { setSelectedCheckpoint(cp); setDelta(null); }}
+                    >
+                      {cp.type} ({cp.photo_filenames?.length ?? 0} photos)
+                    </button>
+                  ))}
+                </div>
+                <details className="add-checkpoint-details">
+                  <summary>+ Add Checkpoint</summary>
+                  <CheckpointForm
+                    projectId={project.id}
+                    onSuccess={(cp) => { handleCheckpointAdded(cp); document.querySelector(".add-checkpoint-details")?.removeAttribute("open"); }}
+                    onCancel={() => document.querySelector(".add-checkpoint-details")?.removeAttribute("open")}
+                  />
+                </details>
+              </div>
+            </section>
+
+            {selectedCheckpoint?.report && (
+              <CheckpointReport
+                report={selectedCheckpoint.report}
+                checkpointType={selectedCheckpoint.type}
+              />
+            )}
+
+            {(project.checkpoints || []).length >= 2 && (
+              <section className="delta-section">
+                <div className="delta-controls-sticky">
+                  <h3>Compare Checkpoints</h3>
+                  <div className="delta-controls">
+                    <select value={deltaFrom} onChange={(e) => setDeltaFrom(e.target.value)}>
+                      <option value="">From</option>
+                      {(project.checkpoints || []).map((cp) => (
+                        <option key={cp.id} value={cp.id}>{cp.type}</option>
+                      ))}
+                    </select>
+                    <span className="arrow">→</span>
+                    <select value={deltaTo} onChange={(e) => setDeltaTo(e.target.value)}>
+                      <option value="">To</option>
+                      {(project.checkpoints || []).map((cp) => (
+                        <option key={cp.id} value={cp.id}>{cp.type}</option>
+                      ))}
+                    </select>
+                    <button
+                      className="verify-btn small"
+                      onClick={() => {
+                        if (deltaFrom && deltaTo) handleFetchDelta();
+                      }}
+                      disabled={!deltaFrom || !deltaTo}
+                    >
+                      Refresh
+                    </button>
+                  </div>
+                </div>
+                {delta && (
+                  <DeltaReport
+                    delta={delta}
+                    projectId={project.id}
+                    toCheckpointId={deltaTo}
+                    onAction={async () => {
+                      const res = await axios.get(`/api/projects/${project.id}`);
+                      setProject(res.data.project);
+                    }}
+                  />
+                )}
+              </section>
+            )}
+
+            {error && (
+              <div className="error-box">{error}</div>
+            )}
+          </>
+        )}
       </main>
 
       <footer className="app-footer">
-        <p>ProofLoad AI &mdash; Hackathon MVP</p>
+        <p>ProofLoad AI — Load Verification with Checkpoints</p>
       </footer>
     </div>
   );

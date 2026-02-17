@@ -11,6 +11,7 @@
   --bg-card: #1e293b;
   --bg-card-hover: #263349;
   --text: #f1f5f9;
+  --text-bright: #e2e8f0;
   --text-muted: #94a3b8;
   --primary: #2563eb;
   --primary-hover: #1d4ed8;
@@ -20,6 +21,8 @@
   --danger-bg: rgba(239, 68, 68, 0.1);
   --warning: #f59e0b;
   --warning-bg: rgba(245, 158, 11, 0.1);
+  --amber: #f59e0b;
+  --amber-bg: rgba(245, 158, 11, 0.12);
   --border: #334155;
   --radius: 12px;
   --radius-sm: 8px;
