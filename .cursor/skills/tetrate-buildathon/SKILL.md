@@ -57,7 +57,7 @@ This project (ProofLoad AI) uses TARS for visual load verification:
 - **Endpoint**: POST /api/verify with multipart form (expectedImage, actualImage)
 - **Output**: JSON with status, missing_items, extra_items, summary, confidence
 
-See project root `AGENT.md` for full integration standards and `docs/AI_VERIFICATION_AGENT.md` for agent spec.
+See `docs/AGENT.md` for full integration standards and `docs/AI_VERIFICATION_AGENT.md` for agent spec.
 
 ## Cost & Reliability
 

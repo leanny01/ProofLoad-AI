@@ -1,20 +1,39 @@
-# ProofLoad AI – Load Verification with Checkpoints
+# ProofLoad AI — Load Verification with Checkpoints
 
-AI-powered tool that verifies loads against manifest lists, documents item condition, and compares reality across multiple checkpoints (Start → End).
+AI-powered load verification that compares manifests against photos, documents item condition, and compares reality across multiple checkpoints (Start → End).
 
-## Quick Start
+---
+
+## Documentation
+
+| Document | Description |
+|----------|-------------|
+| [**docs/**](docs/README.md) | Documentation index |
+| [**Project Overview**](docs/PROJECT_OVERVIEW.md) | App summary, AI features, Tetrate usage, target user, implementation |
+| [**Scope**](docs/SCOPE.md) | MVP scope, in/out of scope, expected formats, report schemas, success criteria |
+| [**AI Verification Agent**](docs/AI_VERIFICATION_AGENT.md) | Agent spec for image comparison: inputs, outputs, rules |
+| [**Integration Standards**](docs/AGENT.md) | TARS integration patterns, security, streaming, cost controls |
+
+---
+
+## Setup Notes
+
+### Prerequisites
+
+- Node.js 18+
+- TARS API key from [router.tetrate.ai/api-keys](https://router.tetrate.ai/api-keys)
 
 ### 1. Backend
 
 ```bash
 cd backend
 cp .env.example .env
-# Edit .env and add your TARS API key (https://router.tetrate.ai/api-keys)
+# Edit .env and set TARS_API_KEY
 npm install
 npm start
 ```
 
-Backend runs on `http://localhost:3001`
+Backend runs on `http://localhost:3001`.
 
 ### 2. Frontend
 
@@ -24,40 +43,43 @@ npm install
 npm run dev
 ```
 
-Frontend runs on `http://localhost:5173` (proxies API calls to backend)
+Frontend runs on `http://localhost:5173` (proxies `/api` to backend).
 
-### 3. Workflow
+### 3. Verify
 
-1. **Create Project** – Upload an expected list (CSV, XLSX, PDF, or image). Items are extracted as name, description, qty.
-2. **Add Checkpoints** – Add Start, Checkpoint, or End inspections with photos. Each checkpoint is verified against the list and documents missing items, extra items, and condition.
-3. **Compare** – When you have 2+ checkpoints, select From → To and get a delta report: missing since, added since, condition changes.
+- Health: `GET http://localhost:3001/api/health`
+- Open `http://localhost:5173` and create a project by uploading a manifest (CSV, XLSX, PDF, or image).
 
-## Tech Stack
+---
 
-- **Frontend:** React (Vite)
-- **Backend:** Node.js + Express
-- **AI:** Tetrate Agent Router Service (TARS) – GPT-4o Vision
-- **List extraction:** csv-parse, xlsx, pdf-parse + AI for PDF/image
+## Demo Credentials
 
-## API
+**No login required.** ProofLoad AI does not use authentication in the MVP. All features are available immediately.
 
-### Projects & Checkpoints
+**Demo workflow:**
+
+1. **Create Project** — Upload a manifest. Use `backend/test-sample.csv` or any CSV/XLSX/PDF/image with items.
+2. **Add Checkpoint** — Add a Start, Checkpoint, or End inspection with 1–20 photos.
+3. **Compare** — With 2+ checkpoints, select From → To to view delta (missing, added, condition changes).
+
+---
+
+## Internal Notes
+
+- **Tetrate usage:** All AI calls go through TARS (`api.router.tetrate.ai`) to GPT-4o. See [Project Overview](docs/PROJECT_OVERVIEW.md) for details.
+- **Stateless MVP:** Projects are stored in memory; data is lost on backend restart.
+- **Legacy endpoint:** `POST /api/verify` (expectedImage + actualImage) remains for simple image-vs-image comparison.
+- **Sample data:** `backend/test-sample.csv` is provided for quick testing.
+
+---
+
+## API Quick Reference
 
 ```
 GET  /api/projects
-POST /api/projects          # multipart: manifest (CSV/XLSX/PDF/image)
+POST /api/projects                    # multipart: manifest
 GET  /api/projects/:id
-POST /api/projects/:id/checkpoints  # multipart: type (start|checkpoint|end), photos[]
-GET  /api/projects/:id/delta?from=checkpointId&to=checkpointId
+POST /api/projects/:id/checkpoints     # multipart: type, photos[]
+GET  /api/projects/:id/delta?from=&to=
+POST /api/verify                      # multipart: expectedImage, actualImage (legacy)
 ```
-
-### Legacy (image vs image)
-
-```
-POST /api/verify
-Fields: expectedImage, actualImage
-```
-
-## Scope
-
-See `docs/SCOPE.md` for full MVP scope, in-scope/out-of-scope, and report formats.
