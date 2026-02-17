@@ -55,6 +55,53 @@ ProofLoad AI uses **Tetrate Agent Router Service (TARS)** as its sole AI gateway
 
 ---
 
+## Assumptions & constraints
+
+- Photos are sufficiently clear to see at least item-level packaging/labels for a portion of the load.
+- The expected list describes items at a human-recognizable granularity (not just internal SKUs with no visible markings).
+- The system will prioritize **not hallucinating** over guessing; unclear evidence yields `Unknown` and `NeedsReview`.
+- Typical job size is limited (e.g., ≤ 1 list file and ≤ 10–20 photos) to keep latency acceptable.
+
+---
+
+## Success criteria (MVP)
+
+- Accepts all supported list file types and produces normalized expected items with warnings when needed.
+- Produces a JSON report for any job, even when extraction/counting is imperfect.
+- Identifies major mismatches (obvious missing/extra items) and obvious condition failures with evidence references.
+- Clearly flags uncertainty with `NeedsReview` rather than overconfident claims.
+
+---
+
+## Out of scope (for MVP)
+
+### Not guaranteed in MVP
+
+- **Perfect counting** in cluttered / occluded photos (allowed to return `observed_qty=null`)
+- **Barcode/QR scanning** and formal SKU-level identification
+- **3D reasoning** (stack depth estimation) beyond what is clearly visible
+- **Automatic photo annotation** (bounding boxes / drawn overlays)
+- **Warehouse integration** (WMS/ERP), EDI, or carrier APIs
+- **Long-term storage** of uploads or reports in a database (MVP may be stateless)
+- **Multi-manifest** reconciliation in one job (MVP is exactly one expected list per job)
+- **User accounts / auth / roles**, audit trails, or multi-tenant isolation
+- **Human-in-the-loop review UI** beyond surfacing "NeedsReview" warnings
+- **Internationalization** (languages, locales) beyond basic English text
+- **Fraud detection / tamper detection** for images and documents
+
+---
+
+## Future scope candidates (post-MVP)
+
+- Persistent job storage + report download links
+- Human review/override workflow with annotations
+- Barcode/label OCR improvements and SKU mapping
+- Configurable policies per customer (allowed damage thresholds, tolerances)
+- Retrieval (RAG) over manifests / historical loads for better matching
+- Real-time streaming progress updates for long analyses
+
+---
+
 ## Implementation
 
 ### Architecture
