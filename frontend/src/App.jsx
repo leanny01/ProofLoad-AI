@@ -140,7 +140,7 @@ function App() {
         {view === "home" && (
           <>
             <section className="home-actions">
-              <button className="verify-btn" onClick={() => setView("create")}>
+              <button className="verify-btn" onClick={() => { setView("create"); setError(null); }}>
                 + New Project
               </button>
             </section>
@@ -166,7 +166,7 @@ function App() {
 
         {view === "create" && (
           <>
-            <button className="back-btn" onClick={() => setView("home")}>
+            <button className="back-btn" onClick={() => { setView("home"); setError(null); }}>
               ← Back
             </button>
             <ManifestUpload
@@ -179,7 +179,7 @@ function App() {
 
         {view === "project" && project && (
           <>
-            <button className="back-btn" onClick={() => { setView("home"); setProject(null); setDelta(null); setSelectedCheckpoint(null); }}>
+            <button className="back-btn" onClick={() => { setView("home"); setProject(null); setDelta(null); setSelectedCheckpoint(null); setError(null); }}>
               ← Back to projects
             </button>
 
